@@ -43,7 +43,6 @@ class Task(BaseModel):
     commit: Commit
     dependencies: List[str] = conlist(item_type=str, min_items=0)
     parameters: List[str] = Field(default_factory=List)
-    status: ExecutionState = Field(default=ExecutionState.waiting)
 
 
 class PipelineDefinition(BaseModel):
@@ -57,15 +56,3 @@ class PipelineInstance(BaseModel):
     tasks: List[Task]
     # @TODO make this id an instance.
     pipeline_definition_id: str = ""
-
-    @property
-    def status(self) -> ExecutionState:
-        if any(map(lambda x: self.tasks[0].status == ExecutionState.scheduled, self.tasks)):
-            return ExecutionState.scheduled
-        if any(map(lambda x: self.tasks[0].status == ExecutionState.waiting, self.tasks)):
-            return ExecutionState.waiting
-        if any(map(lambda x: self.tasks[0].status == ExecutionState.running, self.tasks)):
-            return ExecutionState.running
-        if any(map(lambda x: self.tasks[0].status == ExecutionState.failed, self.tasks)):
-            return ExecutionState.failed
-        return ExecutionState.success

@@ -1,7 +1,11 @@
 ###
 # LakeFs wrapper class
 ###
+import boto3
 import os
+import ntpath
+import fnmatch
+import shutil
 from functools import reduce
 
 from lakefs_client import models
@@ -9,7 +13,7 @@ from lakefs_client.client import LakeFSClient
 import lakefs_client
 
 from typing import List
-from src.models.pipeline import Commit, CommitMetaData, Task, ExecutionState, PipelineInstance
+from avalon.models.pipeline import Commit, CommitMetaData, Task, ExecutionState, PipelineInstance
 
 
 class LakeFsWrapper:
@@ -17,6 +21,10 @@ class LakeFsWrapper:
         os.environ.get('')
         self._config = configuration
         self._client = LakeFSClient(configuration=configuration)
+        self._s3_client = boto3.client('s3',
+                          endpoint_url=self._config.host,
+                          aws_access_key_id=self._config.username,
+                          aws_secret_access_key=self._config.password)
 
     def list_repo(self):
         """
@@ -120,7 +128,7 @@ class LakeFsWrapper:
             )
             return pipeline_instance
 
-    def commit_files(self, commit: Commit):
+    def commit_files(self, commit: Commit, remote_path=None):
         """
         Uploads and commits files to a branch
         :param commit:
@@ -129,7 +137,8 @@ class LakeFsWrapper:
         self._upload_files(
             commit.branch,
             commit.repo,
-            commit.files_added
+            commit.files_added,
+            remote_path=remote_path
         )
         commit_creation = models.CommitCreation(commit.message, metadata=commit.metadata.dict(exclude={"args"}) if commit.metadata else {})
         response = self._client.commits.commit(
@@ -139,16 +148,54 @@ class LakeFsWrapper:
         )
         return response
 
-    def _upload_files(self, branch: str, repository: str, files: List[str]):
+    def _upload_files(self, branch: str, repository: str, files: List[str], remote_path=None):
+        """
+
+        :param branch:
+        :param repository:
+        :param files:
+        :param remote_path:
+        :return:
+        """
         for f in files:
+            base_file_name =  ntpath.basename(f)
+            if remote_path:
+                dest_file_path = ntpath.join(remote_path, base_file_name)
+            else:
+                dest_file_path = f
             with open(f, 'rb') as stream:
                 self._client.objects.upload_object(repository=repository,
                                                    branch=branch,
-                                                   path=f,
+                                                   path=dest_file_path,
                                                    content=stream)
 
-    def get_object(self, branch: str, repository: str, path: str):
-        return self._client.objects.get_object(repository=repository, ref=branch, path=path)
+    def get_as_s3_object(self, repository, branch, remote_file_path, local_file_path):
+        list_resp = self._s3_client.list_objects_v2(Bucket=repository, Prefix=branch)
+        for obj in list_resp['Contents']:
+            print(obj['Key'])
+
+
+    def get_object(self, branch: str, repository: str, remote_path: str,local_path: str):
+        objects = self._client.objects.list_objects(repository=repository, ref=branch)
+        paths = []
+        for obj in objects.results:
+            paths.append(obj.path)
+        # get matching files
+        matching_files = fnmatch.filter(paths, remote_path)
+        # setup local dirs
+        dirs = set(map(lambda x: ntpath.join(local_path, ntpath.dirname(x)), matching_files ))
+        for dir in dirs:
+            if not os.path.exists(dir):
+                os.makedirs(dir)
+        for location in matching_files:
+            file_name = ntpath.basename(location)
+            dir_name = ntpath.dirname(location)
+            buffered_reader = self._client.objects.get_object(repository=repository, ref=branch, path=location)
+            buffered_reader.close()
+            shutil.move(ntpath.join(self._config.temp_folder_path, file_name), ntpath.join(
+                local_path, dir_name, file_name
+            ))
+        return None
 
     def create_branch(self, branch_name: str, repository_name: str, source_branch: str="main"):
         branches = self.list_branches(repository_name=repository_name).results

@@ -3,10 +3,10 @@ from functools import lru_cache
 
 import uvicorn
 from fastapi import FastAPI
-from src.operations.LakeFsWrapper import LakeFsWrapper
+from avalon.operations.LakeFsWrapper import LakeFsWrapper
 import lakefs_client
-from src import config
-from src.models.pipeline import PipelineInstance
+# from src.avalon import config
+from avalon.models.pipeline import PipelineInstance
 
 app = FastAPI()
 
