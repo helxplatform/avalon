@@ -1,4 +1,4 @@
-lakefs_client==0.69.1
+lakefs_client==0.105.0
 pydantic
 fastapi
 pyyaml
