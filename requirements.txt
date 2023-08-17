@@ -1,4 +1,4 @@
-lakefs_client==0.106.1
+lakefs_client==0.106.2
 pydantic
 pyyaml
 httpx
