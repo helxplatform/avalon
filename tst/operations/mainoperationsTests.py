@@ -7,6 +7,8 @@ from avalon.mainoperations import put_files, get_files
 from avalon.operations.LakeFsWrapper import LakeFsWrapper
 
 
+LOCALTEMPPATH = "temp"
+
 # These are not fully automated tests.
 class MainOperationsTests(unittest.TestCase):
 
@@ -15,7 +17,7 @@ class MainOperationsTests(unittest.TestCase):
                                              username='AKIAIOSFOLQUICKSTART',
                                              password='wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY')
 
-        config.temp_folder_path = "/home/admin2/Documents/tmp"
+        config.temp_folder_path = LOCALTEMPPATH
         return config
 
     def test_put_files(self):
@@ -36,7 +38,7 @@ class MainOperationsTests(unittest.TestCase):
     def test_get_files(self):
         lfs = LakeFsWrapper(configuration=self.get_config())
 
-        get_files(local_path="/home/admin2/Documents/avalon/tmp",
+        get_files(local_path=LOCALTEMPPATH,
                   lake_fs_client=lfs,
                   metafilename="latestrun.out",
                   remote_path="OperationRes",
