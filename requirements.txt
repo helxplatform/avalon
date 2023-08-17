@@ -1,7 +1,5 @@
-lakefs_client==0.105.0
+lakefs_client==0.106.1
 pydantic
-fastapi
 pyyaml
-uvicorn[standard]
 httpx
 boto3
