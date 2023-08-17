@@ -9,7 +9,6 @@ from avalon.config import Config
 def parse_env():
     return {
         "config_path": os.environ.get("LAKEFS_CONFIG_PATH", "../config/lakectl-lakefs.apps.renci.org.yaml"),
-        "lakefs_repo": os.environ.get("LAKEFS_REPO", "test-repo"),
         "lakefs_branch": os.environ.get("LAKEFS_BRANCH", "develop"),
         "metafilename": os.environ.get("METAFILENAME", "thisrun.out"),
     }
@@ -28,7 +27,6 @@ def main(args):
         put_files(
             local_path=args.local_path,
             remote_path=args.remote_path,
-            repo=env_args['lakefs_repo'],
             branch=env_args['lakefs_branch'],
             lake_fs_client=client,
             task_name=args.task_name,
@@ -42,7 +40,6 @@ def main(args):
         get_files(
             local_path=args.local_path,
             remote_path=args.remote_path,
-            repo=env_args['lakefs_repo'],
             branch=env_args['lakefs_branch'],
             lake_fs_client=client
         )
