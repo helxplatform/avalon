@@ -36,7 +36,7 @@ def get_dest_filepaths(files: List[str], rootpath: str, root_destpath: str) -> L
 
     for f in files:
         path_wo_root_dir = f[len(rootpath):]
-        path_wo_root_dir = root_destpath + path_wo_root_dir
+        path_wo_root_dir = os.path.join(root_destpath, path_wo_root_dir)
         dest_path.append(path_wo_root_dir)
 
     return dest_path

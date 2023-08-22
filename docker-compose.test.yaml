@@ -18,7 +18,7 @@ services:
       - "5432:5432"
 
   lakefs:
-    image: treeverse/lakefs:0.106.2
+    image: treeverse/lakefs:0.107.0
     command: run --quickstart
     ports:
       - "8001:8001"

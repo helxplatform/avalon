@@ -26,9 +26,9 @@ class MainOperationsTests(unittest.TestCase):
         put_files(local_path="../data/test1/",
                   branch="main",
                   metafilename="latestrun.out",
-                  remote_path="OperationRes",
+                  remote_path="result",
                   commit_id="1" * 64,
-                  pipeline_id="Pipeline1",
+                  pipeline_id="TestAvalon",
                   task_docker_image="image2",
                   task_args=[],
                   lake_fs_client=lfs,
@@ -41,10 +41,10 @@ class MainOperationsTests(unittest.TestCase):
         get_files(local_path=LOCALTEMPPATH,
                   lake_fs_client=lfs,
                   metafilename="latestrun.out",
-                  remote_path="OperationRes",
+                  remote_path="result",
                   branch="main",
                   changes_only=False,
-                  pipeline_id="Pipeline1",
+                  pipeline_id="TestAvalon",
                   task_name="Task3")
 
 
