@@ -3,9 +3,9 @@ import unittest
 import lakefs_client
 from lakefs_client import Configuration
 
-from avalon.mainoperations import put_files, get_files
+from avalon.mainoperations import put_files, get_files, get_repo_name
 from avalon.operations.LakeFsWrapper import LakeFsWrapper
-
+from avalon.operations.files import get_filepaths
 
 LOCALTEMPPATH = "temp"
 
@@ -35,6 +35,16 @@ class MainOperationsTests(unittest.TestCase):
                   s3storage=False,
                   task_name="Task3")
 
+        result = lfs.get_filelist("main", get_repo_name("TestAvalon","Task3"), remote_path="result")
+
+        self.assertListEqual(result, [
+                                      'result/dir1/file2.txt',
+                                      'result/dir1/file3.txt',
+                                      'result/file1.txt',
+                                      'result/latestrun.out'
+                                      ])
+
+
     def test_get_files(self):
         lfs = LakeFsWrapper(configuration=self.get_config())
 
@@ -46,6 +56,13 @@ class MainOperationsTests(unittest.TestCase):
                   changes_only=False,
                   pipeline_id="TestAvalon",
                   task_name="Task3")
+
+        result = get_filepaths(LOCALTEMPPATH)
+        self.assertListEqual(result, ['temp/.empty',
+                                      'temp/result/latestrun.out',
+                                      'temp/result/file1.txt',
+                                      'temp/result/dir1/file3.txt',
+                                      'temp/result/dir1/file2.txt'])
 
 
 

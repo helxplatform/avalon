@@ -19,7 +19,7 @@ def get_files(local_path: str,
               lake_fs_client: LakeFsWrapper,
               metafilename: str,
               changes_only: bool):
-    repo = _get_repo_name(pipeline_id, task_name)
+    repo = get_repo_name(pipeline_id, task_name)
     all_repos = [r.Id for r in lake_fs_client.list_repo()]
 
     if not os.path.exists(local_path):
@@ -54,7 +54,7 @@ def put_files(local_path: str,
               s3storage: bool,
               metafilename: str,
               commit_id: str):
-    repo = _get_repo_name(pipeline_id, task_name)
+    repo = get_repo_name(pipeline_id, task_name)
 
     _create_repositry_branch_IfNotExists(branch, lake_fs_client, repo, s3storage)
 
@@ -90,7 +90,7 @@ def put_files(local_path: str,
             raise ex
 
 
-def _get_repo_name(pipeline_id, task_name):
+def get_repo_name(pipeline_id: str, task_name: str):
     repo = str.lower(f"{pipeline_id}-{task_name}")
     return repo
 
