@@ -33,7 +33,7 @@ class Task(BaseModel):
     task_name: str
     task_image: str
     commit: Commit
-    dependencies: List[str] = conlist(item_type=str, min_length=0)
+    dependencies: List[str] = conlist(item_type=str, min_items=0)
     parameters: List[str] = Field(default_factory=List)
 
 
