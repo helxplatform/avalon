@@ -52,15 +52,16 @@ def put_files(local_path: str,
               task_args,
               lake_fs_client: LakeFsWrapper,
               s3storage: bool,
-              metafilename: str,
-              commit_id: str):
-    repo = get_repo_name(pipeline_id, task_name)
+              repo: str = "",
+              metafilename: str = "",
+              commit_id: str = ""):
+    repo = repo or get_repo_name(pipeline_id, task_name)
 
     _create_repositry_branch_IfNotExists(branch, lake_fs_client, repo, s3storage)
 
     files = get_filepaths(local_path)
     dest_paths = get_dest_filepaths(files, local_path, remote_path)
-    metafilename_path = os.path.join(remote_path, metafilename)
+    metafilename_path = os.path.join(remote_path, metafilename) if metafilename else ""
 
     cmt_meta = CommitMetaData(
         pipeline_id=pipeline_id,
@@ -79,7 +80,8 @@ def put_files(local_path: str,
     )
 
     lake_fs_client.upload_files(cmt.branch, cmt.repo, files, dest_paths)
-    lake_fs_client.upload_file(cmt.branch, cmt.repo, commit_id, metafilename_path)
+    if metafilename_path:
+        lake_fs_client.upload_file(cmt.branch, cmt.repo, commit_id, metafilename_path)
 
     # if uploaded files are the same, it will cause an exception.
     # we can ignore such situation

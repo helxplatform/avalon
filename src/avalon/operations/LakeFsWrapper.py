@@ -71,7 +71,7 @@ class LakeFsWrapper:
         :param commit:
         :return:
         """
-        commit_creation = models.CommitCreation(commit.message, metadata=commit.metadata.model_dump(
+        commit_creation = models.CommitCreation(commit.message, metadata=commit.metadata.dict(
             exclude={"args"}) if commit.metadata else {})
         response = self._client.commits_api.commit(
             branch=commit.branch,
