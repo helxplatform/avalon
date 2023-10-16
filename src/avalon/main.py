@@ -34,7 +34,8 @@ def main(args):
             task_docker_image=args.task_image,
             task_args=args.task_args,
             metafilename=config.metafilename,
-            commit_id=args.commit_id
+            commit_id=args.commit_id,
+            s3storage=args.s3
         )
     else:
         get_files(
@@ -48,6 +49,7 @@ def main(args):
 def cli():
     parser = argparse.ArgumentParser()
     parser.add_argument("-t", "--temp-dir", help="Temporary Dir", default=None)
+    parser.add_argument("-s", "--s3",action="store_true")
     sub_parsers = parser.add_subparsers(help="Sub commands", dest="sub_command")
 
     parser_get_file = sub_parsers.add_parser("get", help="Gets file from Lakefs repo", )
@@ -63,7 +65,7 @@ def cli():
     parser_put_file.add_argument("-i", "--task-image", help="Docker image used to run task", default="helxplatform/roger")
     parser_put_file.add_argument("-cid", "--commit-id", help="Commit id of input data", default=None)
     parser_put_file.add_argument("-a", "--task-args", help="Args used to run image", default=[])
-
+    
     args = parser.parse_args()
     main(args)
 
