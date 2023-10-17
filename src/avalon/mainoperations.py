@@ -18,8 +18,9 @@ def get_files(local_path: str,
               pipeline_id: str,
               lake_fs_client: LakeFsWrapper,
               metafilename: str,
-              changes_only: bool):
-    repo = get_repo_name(pipeline_id, task_name)
+              changes_only: bool,
+              repo:str = None):
+    repo = repo or get_repo_name(pipeline_id, task_name)
     all_repos = [r.Id for r in lake_fs_client.list_repo()]
 
     if not os.path.exists(local_path):
