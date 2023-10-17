@@ -112,8 +112,7 @@ class LakeFsWrapper:
         paths = []
         for obj in objects.results:
             paths.append(obj.path)
-
-        matching_files = list(filter(lambda f: f.startswith(remote_path), paths))
+        matching_files = list(filter(lambda f: f.startswith(remote_path) or remote_path == '*', paths))
         return matching_files
 
     def get_changes(self, branch: str, repository: str, remote_path: str, commit_id: str) -> List[str]:
