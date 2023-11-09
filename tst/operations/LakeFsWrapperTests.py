@@ -2,8 +2,8 @@ import os.path
 import unittest
 from datetime import datetime
 
-import lakefs_client
-from lakefs_client import Configuration
+import lakefs_sdk
+from lakefs_sdk import Configuration
 
 from avalon.models.pipeline import Repository, CommitMetaData, Commit
 from avalon.operations.LakeFsWrapper import LakeFsWrapper

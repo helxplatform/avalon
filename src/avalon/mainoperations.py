@@ -2,7 +2,7 @@ import datetime
 import logging
 import os
 
-import lakefs_client
+from lakefs_sdk.client import LakeFSClient
 
 from avalon.models.pipeline import CommitMetaData, Commit, Repository
 from avalon.operations.LakeFsWrapper import LakeFsWrapper
@@ -35,7 +35,7 @@ def get_files(local_path: str,
             commit_id = _get_last_commit_id(branch, lake_fs_client, local_path, metafilename, remote_path, repo)
             # if commit_id is empty nonexistant then we will get all files, not just changed ones
             filelist = lake_fs_client.get_changes(repository=repo, branch=branch, remote_path=remote_path, commit_id=commit_id)
-        except lakefs_client.exceptions.NotFoundException:
+        except LakeFSClient.exceptions.NotFoundException:
             filelist = lake_fs_client.get_filelist(repository=repo, branch=branch, remote_path=remote_path)
     else:
         filelist = lake_fs_client.get_filelist(repository=repo, branch=branch, remote_path=remote_path)
@@ -85,7 +85,7 @@ def put_files(local_path: str,
     # we can ignore such situation
     try:
         lake_fs_client.commit_files(cmt)
-    except lakefs_client.exceptions.ApiException as ex:
+    except LakeFSClient.exceptions.ApiException as ex:
         if str.find(ex.body, 'commit: no changes') == -1:
             raise ex
 
