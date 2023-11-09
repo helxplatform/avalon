@@ -16,7 +16,7 @@ class MainOperationsTests(unittest.TestCase):
         create_dirs([LOCALTEMPPATH])
 
     def get_config(self) -> Configuration:
-        config = Configuration(host='http://localhost:8000/api/v1',
+        config = Configuration(host='http://localhost:8001/api/v1',
                                              username='AKIAIOSFOLQUICKSTART',
                                              password='wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY')
 
