@@ -6,6 +6,7 @@ from lakefs_sdk import Configuration, CommitCreation, BranchCreation
 
 from typing import List
 
+from lakefs_sdk.exceptions import NotFoundException
 from lakefs_sdk.models.repository_creation import RepositoryCreation
 
 from avalon.models.pipeline import Commit, Repository
@@ -51,14 +52,15 @@ class LakeFsWrapper:
         branches = self._client.branches_api.list_branches(repository=repository_name)
         return branches
 
-    def list_commits(self, repository_name: str, branch_name: str):
+    def list_commits(self, repository_name: str, branch_name: str, path: [str]):
         """
         List commits in a branch
         :param repository_name:
         :param branch_name:
+        :param path: path
         :return:
         """
-        commits = self._client.refs_api.log_commits(repository=repository_name, ref=branch_name)
+        commits = self._client.refs_api.log_commits(repository=repository_name, ref=branch_name, prefixes=path)
         return commits
 
     def commit_files(self, commit: Commit):
@@ -110,40 +112,40 @@ class LakeFsWrapper:
         matching_files = list(filter(lambda f: f.startswith(remote_path), paths))
         return matching_files
 
-    def get_changes(self, branch: str, repository: str, remote_path: str, commit_id: str) -> List[str]:
+    def get_changes(self, branch: str, repository: str, remote_path: str, from_commit_id: str) -> List[str]:
         """
         Returns list of remote paths that were changed since specified commit
         :param branch: branch name
         :param repository: repository name
         :param remote_path: path as in Lakefs
-        :param commit_id: id of a commit
+        :param from_commit_id: id of a commit
         :return: list ot remote paths in LakeFs
         """
         files_changed = []
         files_removed = []
         files_added = []
 
-        commits = self.list_commits(repository_name=repository, branch_name=branch).results
+        commits = self.list_commits(repository_name=repository, branch_name=branch, path=remote_path.split("/")).results
         commits_to_proc = []
 
         for commit in commits:
-            if commit.id != commit_id:
+            if commit.id != from_commit_id:
                 commits_to_proc.append(commit)
             else:
                 break
 
-        for commit in commits_to_proc:
-            parent_refs = commit.parents
-            for parent_ref in parent_refs:
-                files = self._client.refs_api.diff_refs(repository=repository, right_ref=commit.id,
-                                                        left_ref=parent_ref).results
-                for file in files:
-                    if file.type == 'added':
-                        files_added.append(file.path)
-                    elif file.type == 'removed':
-                        files_removed.append(file.path)
-                    elif file.type == 'changed':
-                        files_changed.append(file.path)
+        if len(commits_to_proc) == 0:
+            raise NotFoundException()
+
+        # for commit in commits_to_proc:
+        files = self._client.refs_api.diff_refs(repository=repository, right_ref=commits_to_proc[0].id, left_ref=from_commit_id).results
+        for file in files:
+            if file.type == 'added':
+                files_added.append(file.path)
+            elif file.type == 'removed':
+                files_removed.append(file.path)
+            elif file.type == 'changed':
+                files_changed.append(file.path)
 
         paths = []
         paths.extend(files_changed)
