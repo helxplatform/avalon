@@ -1,15 +1,14 @@
-import lakefs_client
 import yaml
+from lakefs_sdk import Configuration
 
 
 class Config:
-    def __init__(self, lakefs_conf_path: str, metafilename: str, temp_dir: str = None):
+    def __init__(self, lakefs_conf_path: str, temp_dir: str = None):
         self.lakefs_conf_path = lakefs_conf_path
         self.temp_dir = temp_dir
-        self.metafilename = metafilename
 
     def get_config(self):
-        configuration = lakefs_client.Configuration()
+        configuration = Configuration()
         if self.temp_dir:
             configuration.temp_folder_path = self.temp_dir
         with open(self.lakefs_conf_path) as stream:
