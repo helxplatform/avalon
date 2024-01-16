@@ -1,4 +1,4 @@
-lakefs-sdk==1.2.0
+lakefs-sdk==1.8.0
 pydantic
 pyyaml
 httpx
