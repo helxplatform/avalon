@@ -99,13 +99,14 @@ class MainOperationsTests(unittest.TestCase):
                   changes_only=False)
 
         result = get_filepaths(LOCALTEMPPATH)
-        self.assertListEqual(result, ['temp/result/.empty',
+        self.assertListEqual(result, ['temp/.empty',
                                       'temp/result/file1.txt',
+                                      'temp/result/file4.txt',
                                       'temp/result/dir1/file3.txt',
                                       'temp/result/dir1/file2.txt'])
 
     def test_get_files_changes_only(self):
-      #  self.remove_tempresult_folder()
+      #  CLEAN RESULT DIR BEFORE RUN
         lfs = LakeFsWrapper(configuration=self.get_config())
 
         commit_id = get_commit_id_by_input_commit_id(lake_fs_client=lfs,
@@ -122,11 +123,11 @@ class MainOperationsTests(unittest.TestCase):
                   changes_only=True,
                   changes_from=commit_id)
 
-        result = get_filepaths(LOCALTEMPPATH)
-        self.assertListEqual(result, ['temp/.empty',
+        result = sorted(get_filepaths(LOCALTEMPPATH))
+        self.assertListEqual(result, sorted(['temp/.empty',
                                       'temp/result/file4.txt',
                                       'temp/result/dir1/file3.txt',
-                                      'temp/result/dir1/file2.txt'])
+                                      'temp/result/dir1/file2.txt']))
 
     def test_get_last_input_commit_id(self):
         #need to run after test_put_files_update_files

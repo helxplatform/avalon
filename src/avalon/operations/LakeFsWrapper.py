@@ -168,10 +168,14 @@ class LakeFsWrapper:
         for location in remote_files:
             file_name = os.path.basename(location)
             dir_name = os.path.dirname(location)
-            obj_bytes = self._client.objects_api.get_object(repository=repository, ref=branch, path=location)
             dest_path = os.path.join(local_path, dir_name, file_name)
-            with open(dest_path, 'wb') as f:
-                f.write(obj_bytes)
+
+            self.download_file(dest_path, branch, location, repository)
+
+    def download_file(self, dest_path, branch, location, repository):
+        obj_bytes = self._client.objects_api.get_object(repository=repository, ref=branch, path=location)
+        with open(dest_path, 'wb') as f:
+            f.write(obj_bytes)
 
     def create_branch(self, branch_name: str, repository_name: str, source_branch: str = "main"):
         """

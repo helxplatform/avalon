@@ -1,8 +1,9 @@
 import datetime
 import logging
 import os
-
+import urllib3
 from lakefs_sdk.exceptions import NotFoundException, ApiException
+from retrying import retry
 
 from avalon.models.pipeline import CommitMetaData, Commit, Repository
 from avalon.operations.LakeFsWrapper import LakeFsWrapper
@@ -12,6 +13,18 @@ logger = logging.Logger('avalon')
 
 INPUT_COMMIT_ID = 'input_commit_id'
 
+GET_FILES_RETRY_MAX = os.environ.get("LAKEFS_GET_FILES_RETRY_MAX", 10)
+GET_FILES_RETRY_DELAY = os.environ.get("LAKEFS_GET_FILES_RETRY_DELAY", 5000)
+
+
+def _retry_if_error(exception):
+    """Returns True if we need to try again after exception"""
+    return isinstance(exception, urllib3.exceptions.NewConnectionError)
+
+
+@retry(retry_on_exception=_retry_if_error,
+       wait_fixed=GET_FILES_RETRY_DELAY,
+       stop_max_attempt_number=GET_FILES_RETRY_DELAY)
 def get_files(local_path: str,
               remote_path: str,
               repo: str,
@@ -38,7 +51,15 @@ def get_files(local_path: str,
     else:
         filelist = lake_fs_client.get_filelist(repository=repo, branch=branch, remote_path=remote_path)
 
-    lake_fs_client.download_files(remote_files=filelist, local_path=local_path, repository=repo, branch=branch)
+    try:
+        logger.info("Trying to download files from LakeFS")
+        lake_fs_client.download_files(remote_files=filelist, local_path=local_path, repository=repo, branch=branch)
+        logger.info("Downloading files from LakeFS completed")
+    except Exception as ex:
+        logger.info("Failed to download files from LakeFS ")
+        logger.exception(ex)
+        raise
+
 
 
 def put_files(local_path: str,

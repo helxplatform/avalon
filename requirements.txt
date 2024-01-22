@@ -3,3 +3,4 @@ pydantic
 pyyaml
 httpx
 boto3
+retrying
