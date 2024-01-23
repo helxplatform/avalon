@@ -149,3 +149,13 @@ def _create_repositry_branch_IfNotExists(branch, lake_fs_client, repo, s3storage
         lake_fs_client.create_branch(branch, repo)
 
 
+def _get_last_commit_id(branch, lake_fs_client, local_path, metafilename, remote_path, repo):
+    metafilepath_remote = os.path.join(remote_path, metafilename)
+    metafilepath_local = os.path.join(remote_path, metafilename)
+    lake_fs_client.download_files([metafilepath_remote], local_path, repository=repo, branch=branch)
+    commit_id = ""
+    with open(metafilepath_local) as file:
+        commit_id = file.read()
+    if len(commit_id) != 64:
+        logger.error("metafile content is not valid")
+    return commit_id

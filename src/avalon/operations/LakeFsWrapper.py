@@ -104,7 +104,23 @@ class LakeFsWrapper:
         :param remote_path: path as in Lakefs
         :return:
         """
-        objects = self._client.objects_api.list_objects(repository=repository, ref=branch)
+        results = []
+        has_results = True
+        current = 0
+        next_page = None
+        while has_results:
+            if not next_page:
+                objects = self._client.objects_api.list_objects(repository=repository,
+                                                                ref=branch,
+                                                                amount=1000)
+            else:
+                objects = self._client.objects_api.list_objects(repository=repository,
+                                                                ref=branch,
+                                                                amount=1000,
+                                                                after=next_page)
+            results += objects.results
+            has_results = objects.pagination.has_more
+            next_page = objects.pagination.next_offset
         paths = []
         for obj in objects.results:
             paths.append(obj.path)
