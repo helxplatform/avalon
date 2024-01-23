@@ -13,6 +13,7 @@ class CommitMetaData(BaseModel):
     task_image: str
     args: List[str] = []
     pipeline_instance_id: str = ""
+    input_commit_id: str = ""
 
 
 

@@ -9,8 +9,7 @@ from avalon.config import Config
 def parse_env():
     return {
         "config_path": os.environ.get("LAKEFS_CONFIG_PATH", "../config/lakectl-lakefs.apps.renci.org.yaml"),
-        "lakefs_branch": os.environ.get("LAKEFS_BRANCH", "develop"),
-        "metafilename": os.environ.get("METAFILENAME", "thisrun.out"),
+        "lakefs_branch": os.environ.get("LAKEFS_BRANCH", "develop")
     }
 
 
@@ -19,8 +18,7 @@ def main(args):
     env_args = parse_env()
     config = Config(
         lakefs_conf_path=env_args["config_path"],
-        temp_dir=args.temp_dir,
-        metafilename=env_args["metafilename"])
+        temp_dir=args.temp_dir)
     client = LakeFsWrapper(configuration=config.get_config())
 
     if command == "put":
@@ -33,9 +31,7 @@ def main(args):
             pipeline_id=args.pipeline_name,
             task_docker_image=args.task_image,
             task_args=args.task_args,
-            metafilename=config.metafilename,
-            commit_id=args.commit_id,
-            s3storage=args.s3
+            commit_id=args.commit_id
         )
     else:
         get_files(
