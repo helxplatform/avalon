@@ -2,7 +2,7 @@ import os
 
 import boto3
 from lakefs_sdk.client import LakeFSClient
-from lakefs_sdk import Configuration, CommitCreation, BranchCreation
+from lakefs_sdk import Configuration, CommitCreation, BranchCreation, exceptions
 
 from typing import List
 
@@ -196,11 +196,9 @@ class LakeFsWrapper:
         """
         Creates new branch
         """
-        branches = self.list_branches(repository_name=repository_name).results
-        for b in branches:
-            if b['id'] == branch_name:
-                return b
-        else:
+        try:
+            return self._client.branches_api.get_branch(repository=repository_name, branch=branch_name)
+        except exceptions.NotFoundException as Ex:
             branch_creation = BranchCreation(name=branch_name, source=source_branch)
             commit_id = self._client.branches_api.create_branch(repository=repository_name,
                                                                 branch_creation=branch_creation)
