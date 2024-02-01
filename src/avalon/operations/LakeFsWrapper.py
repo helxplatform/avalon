@@ -1,3 +1,4 @@
+import logging
 import os
 
 import boto3
@@ -173,9 +174,27 @@ class LakeFsWrapper:
             self.download_file(dest_path, branch, location, repository)
 
     def download_file(self, dest_path, branch, location, repository):
-        obj_bytes = self._client.objects_api.get_object(repository=repository, ref=branch, path=location)
+        logging.info("Downloading file: {0}, {1}, {2}".format(branch, location, repository))
+        file_info = self._client.objects_api.stat_object(repository=repository, ref=branch, path=location)
+        file_size = file_info.size_bytes
+        logging.info("File size: {0}".format(file_size))
+        chunk = 32 * 1024 * 1024
+        current_pos = 0
+
         with open(dest_path, 'wb') as f:
-            f.write(obj_bytes)
+            while current_pos < file_size:
+                from_bytes = current_pos
+                to_bytes = min(current_pos + chunk, file_size - 1)
+                logging.info("Downloading bytes: {0} - {1}".format(from_bytes, to_bytes))
+                obj_bytes = self._client.objects_api.get_object(repository=repository,
+                                                                ref=branch,
+                                                                path=location,
+                                                                range="bytes={0}-{1}".format(from_bytes, to_bytes))
+                f.write(obj_bytes)
+                current_pos = to_bytes + 1
+
+        logging.info("Downloading completed: {0}".format(current_pos - 1))
+
 
     def create_branch(self, branch_name: str, repository_name: str, source_branch: str = "main"):
         """
