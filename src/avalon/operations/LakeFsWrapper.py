@@ -122,7 +122,7 @@ class LakeFsWrapper:
             has_results = objects.pagination.has_more
             next_page = objects.pagination.next_offset
         paths = []
-        for obj in objects.results:
+        for obj in results:
             paths.append(obj.path)
         matching_files = list(filter(lambda f: f.startswith(remote_path) or remote_path == '*', paths))
         return matching_files
