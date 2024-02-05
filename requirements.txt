@@ -4,3 +4,4 @@ pyyaml
 httpx
 boto3
 retrying
+requests
