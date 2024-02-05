@@ -1,7 +1,11 @@
+import json
 import logging
 import os
+import urllib.parse
 
 import boto3
+import requests
+
 from lakefs_sdk.client import LakeFSClient
 from lakefs_sdk import Configuration, CommitCreation, BranchCreation
 
@@ -19,10 +23,6 @@ class LakeFsWrapper:
         os.environ.get('')
         self._config = configuration
         self._client = LakeFSClient(configuration=configuration)
-        self._s3_client = boto3.client('s3',
-                                       endpoint_url=self._config.host,
-                                       aws_access_key_id=self._config.username,
-                                       aws_secret_access_key=self._config.password)
 
     def list_repo(self) -> list[Repository]:
         """
@@ -82,11 +82,25 @@ class LakeFsWrapper:
         """
         This function uploads files
         """
+        login_cookie = self._get_login_cookie()
         for i in range(len(files)):
-            self._client.objects_api.upload_object(repository=repository,
-                                                   branch=branch,
-                                                   path=dest_paths[i],
-                                                   content=files[i])
+            with open(files[i], 'rb') as f:
+                url = f'{self._config.host}/repositories/{urllib.parse.quote_plus(repository)}/branches/{urllib.parse.quote_plus(branch)}/objects?path={urllib.parse.quote_plus(dest_paths[i])}'
+                res = requests.post(url, data=f, cookies=login_cookie)
+                if res.status_code != 201:
+                    raise Exception(f"Failed to upload file to lakefs: {res.json()}")
+                logging.info(f'Upload file result: {res.json()}')
+
+    def _get_login_cookie(self):
+        login_url = f"{self._config.host}/auth/login"
+        auth_resp = requests.post(login_url, json={"access_key_id": self._config.username,
+                                                   "secret_access_key": self._config.password})
+        if auth_resp.status_code != 200:
+            raise Exception(f"Authentication to lakefs failed: {auth_resp.status_code}")
+
+        resp = json.loads(auth_resp.text)
+        return auth_resp.cookies
+
 
     def upload_file(self, branch: str, repository: str, content: str, dest_path: str):
         """
