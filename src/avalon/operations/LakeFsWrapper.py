@@ -7,7 +7,7 @@ import boto3
 import requests
 
 from lakefs_sdk.client import LakeFSClient
-from lakefs_sdk import Configuration, CommitCreation, BranchCreation
+from lakefs_sdk import Configuration, CommitCreation, BranchCreation, exceptions
 
 from typing import List
 
@@ -119,12 +119,27 @@ class LakeFsWrapper:
         :param remote_path: path as in Lakefs
         :return:
         """
-        objects = self._client.objects_api.list_objects(repository=repository, ref=branch)
+        results = []
+        has_results = True
+        current = 0
+        next_page = None
+        while has_results:
+            if not next_page:
+                objects = self._client.objects_api.list_objects(repository=repository,
+                                                                ref=branch,
+                                                                amount=1000)
+            else:
+                objects = self._client.objects_api.list_objects(repository=repository,
+                                                                ref=branch,
+                                                                amount=1000,
+                                                                after=next_page)
+            results += objects.results
+            has_results = objects.pagination.has_more
+            next_page = objects.pagination.next_offset
         paths = []
-        for obj in objects.results:
+        for obj in results:
             paths.append(obj.path)
-
-        matching_files = list(filter(lambda f: f.startswith(remote_path), paths))
+        matching_files = list(filter(lambda f: f.startswith(remote_path) or remote_path == '*', paths))
         return matching_files
 
     def get_changes(self, branch: str, repository: str, remote_path: str, from_commit_id: str) -> List[str]:
@@ -214,11 +229,9 @@ class LakeFsWrapper:
         """
         Creates new branch
         """
-        branches = self.list_branches(repository_name=repository_name).results
-        for b in branches:
-            if b['id'] == branch_name:
-                return b
-        else:
+        try:
+            return self._client.branches_api.get_branch(repository=repository_name, branch=branch_name)
+        except exceptions.NotFoundException as Ex:
             branch_creation = BranchCreation(name=branch_name, source=source_branch)
             commit_id = self._client.branches_api.create_branch(repository=repository_name,
                                                                 branch_creation=branch_creation)

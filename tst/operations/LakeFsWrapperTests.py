@@ -86,6 +86,10 @@ class LakeFsWrapperTests(unittest.TestCase):
                                 "e5759e1ea49a81bdfcd8acfef186dfb04458e5baaca03c38fca58d79f662d2ac")
         print(files)
 
+    def test_ListFiles(self):
+        lfs = LakeFsWrapper(configuration=self.get_config())
+        files = lfs.get_filelist("main", BIGPIPELINEOPERATION, "20001212")
+
 
 if __name__ == '__main__':
     unittest.main()
