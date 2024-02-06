@@ -1,5 +1,6 @@
-lakefs_client==0.69.1
+lakefs-sdk==1.8.0
 pydantic
-fastapi
 pyyaml
-uvicorn[standard]
+httpx
+boto3
+retrying
