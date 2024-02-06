@@ -148,4 +148,3 @@ def _create_repositry_branch_IfNotExists(branch, lake_fs_client, repo, s3storage
     if branch != "main":
         lake_fs_client.create_branch(branch, repo)
 
-
