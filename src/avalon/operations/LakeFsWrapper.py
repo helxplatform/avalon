@@ -96,7 +96,6 @@ class LakeFsWrapper:
         if auth_resp.status_code != 200:
             raise Exception(f"Authentication to lakefs failed: {auth_resp.status_code}")
 
-        resp = json.loads(auth_resp.text)
         return auth_resp.cookies
 
 
