@@ -2,8 +2,6 @@ import json
 import logging
 import os
 import urllib.parse
-
-import boto3
 import requests
 
 from lakefs_sdk.client import LakeFSClient
@@ -88,8 +86,8 @@ class LakeFsWrapper:
                 url = f'{self._config.host}/repositories/{urllib.parse.quote_plus(repository)}/branches/{urllib.parse.quote_plus(branch)}/objects?path={urllib.parse.quote_plus(dest_paths[i])}'
                 res = requests.post(url, data=f, cookies=login_cookie)
                 if res.status_code != 201:
-                    raise Exception(f"Failed to upload file to lakefs: {res.json()}")
-                logging.info(f'Upload file result: {res.json()}')
+                    raise Exception(f"Failed to upload file to lakefs: {res.text}")
+                logging.info(f'Upload file result: {res.text}')
 
     def _get_login_cookie(self):
         login_url = f"{self._config.host}/auth/login"
