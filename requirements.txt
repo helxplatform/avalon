@@ -1,6 +1,7 @@
-lakefs-sdk==1.8.0
+lakefs-sdk==1.12
 pydantic
 pyyaml
 httpx
 boto3
 retrying
+requests
