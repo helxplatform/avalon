@@ -1,6 +1,9 @@
+import json
+import logging
 import os
+import urllib.parse
+import requests
 
-import boto3
 from lakefs_sdk.client import LakeFSClient
 from lakefs_sdk import Configuration, CommitCreation, BranchCreation, exceptions
 
@@ -18,10 +21,6 @@ class LakeFsWrapper:
         os.environ.get('')
         self._config = configuration
         self._client = LakeFSClient(configuration=configuration)
-        self._s3_client = boto3.client('s3',
-                                       endpoint_url=self._config.host,
-                                       aws_access_key_id=self._config.username,
-                                       aws_secret_access_key=self._config.password)
 
     def list_repo(self) -> list[Repository]:
         """
@@ -81,11 +80,24 @@ class LakeFsWrapper:
         """
         This function uploads files
         """
+        login_cookie = self._get_login_cookie()
         for i in range(len(files)):
-            self._client.objects_api.upload_object(repository=repository,
-                                                   branch=branch,
-                                                   path=dest_paths[i],
-                                                   content=files[i])
+            with open(files[i], 'rb') as f:
+                url = f'{self._config.host}/repositories/{urllib.parse.quote_plus(repository)}/branches/{urllib.parse.quote_plus(branch)}/objects?path={urllib.parse.quote_plus(dest_paths[i])}'
+                res = requests.post(url, data=f, cookies=login_cookie)
+                if res.status_code != 201:
+                    raise Exception(f"Failed to upload file to lakefs: {res.text}")
+                logging.info(f'Upload file result: {res.text}')
+
+    def _get_login_cookie(self):
+        login_url = f"{self._config.host}/auth/login"
+        auth_resp = requests.post(login_url, json={"access_key_id": self._config.username,
+                                                   "secret_access_key": self._config.password})
+        if auth_resp.status_code != 200:
+            raise Exception(f"Authentication to lakefs failed: {auth_resp.status_code}")
+
+        return auth_resp.cookies
+
 
     def upload_file(self, branch: str, repository: str, content: str, dest_path: str):
         """
@@ -188,9 +200,27 @@ class LakeFsWrapper:
             self.download_file(dest_path, branch, location, repository)
 
     def download_file(self, dest_path, branch, location, repository):
-        obj_bytes = self._client.objects_api.get_object(repository=repository, ref=branch, path=location)
+        logging.info("Downloading file: {0}, {1}, {2}".format(branch, location, repository))
+        file_info = self._client.objects_api.stat_object(repository=repository, ref=branch, path=location)
+        file_size = file_info.size_bytes
+        logging.info("File size: {0}".format(file_size))
+        chunk = 32 * 1024 * 1024
+        current_pos = 0
+
         with open(dest_path, 'wb') as f:
-            f.write(obj_bytes)
+            while current_pos < file_size:
+                from_bytes = current_pos
+                to_bytes = min(current_pos + chunk, file_size - 1)
+                logging.info("Downloading bytes: {0} - {1}".format(from_bytes, to_bytes))
+                obj_bytes = self._client.objects_api.get_object(repository=repository,
+                                                                ref=branch,
+                                                                path=location,
+                                                                range="bytes={0}-{1}".format(from_bytes, to_bytes))
+                f.write(obj_bytes)
+                current_pos = to_bytes + 1
+
+        logging.info("Downloading completed: {0}".format(current_pos - 1))
+
 
     def create_branch(self, branch_name: str, repository_name: str, source_branch: str = "main"):
         """

@@ -1,0 +1,11 @@
+Testing started at 6:20 PM ...
+Launching unittests with arguments python -m unittest LakeFsWrapperTests.LakeFsWrapperTests.test_FileIntegrityTest in /home/admin2/Documents/avalon/tst/operations
+
+INFO:root:Upload file result: {"checksum":"00cedcf91beffa9ee69f6cfe23a4602d","content_type":"application/octet-stream","metadata":{},"mtime":1707175217,"path":"integrity/file1.txt","path_type":"object","physical_address":"local:///home/lakefs/lakefs/data/block/bigpipelineoperation3/data/gi6pdsdhjao0477k2hn0/cn0mqcdhjao0477k2hs0","size_bytes":10}
+
+Upload file result: {"checksum":"00cedcf91beffa9ee69f6cfe23a4602d","content_type":"application/octet-stream","metadata":{},"mtime":1707175217,"path":"integrity/file1.txt","path_type":"object","physical_address":"local:///home/lakefs/lakefs/data/block/bigpipelineoperation3/data/gi6pdsdhjao0477k2hn0/cn0mqcdhjao0477k2hs0","size_bytes":10}
+
+INFO:root:Upload file result: {"checksum":"a1763560d8361f8f2c3ce792895f4e7c","content_type":"application/octet-stream","metadata":{},"mtime":1707175221,"path":"integrity/biggerfile1.zip","path_type":"object","physical_address":"local:///home/lakefs/lakefs/data/block/bigpipelineoperation3/data/gi6pdsdhjao0477k2hn0/cn0mqd5hjao0477k2hsg","size_bytes":41140776}
+
+Upload file result: {"checksum":"a1763560d8361f8f2c3ce792895f4e7c","content_type":"application/octet-stream","metadata":{},"mtime":1707175221,"path":"integrity/biggerfile1.zip","path_type":"object","physical_address":"local:///home/lakefs/lakefs/data/block/bigpipelineoperation3/data/gi6pdsdhjao0477k2hn0/cn0mqd5hjao0477k2hsg","size_bytes":41140776}
+
