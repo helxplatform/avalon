@@ -56,7 +56,7 @@ def cli():
     parser_get_file.add_argument("-l", "--local-path", help="Local output dir")
     parser_get_file.add_argument("-c", "--changed-files-only", help="To get changed files only", default=False)
     parser_get_file.add_argument("-r", "--repository", help="repository to get data from")
-    parse_args.add_argument("-b", "--branch", help="repository branch")
+    parser_get_file.add_argument("-b", "--branch", help="repository branch")
 
     parser_put_file = sub_parsers.add_parser("put", help="Puts file to Lakefs repo")
     parser_put_file.add_argument("-l", "--local-path", help="Local dir to push")
