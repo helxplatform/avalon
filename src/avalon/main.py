@@ -38,7 +38,10 @@ def main(args):
             local_path=args.local_path,
             remote_path=args.remote_path,
             branch=env_args['lakefs_branch'],
-            lake_fs_client=client
+            lake_fs_client=client,
+            changes_only=args.changed_files_only,
+            repo=args.repository,
+
         )
 
 
@@ -49,9 +52,10 @@ def cli():
     sub_parsers = parser.add_subparsers(help="Sub commands", dest="sub_command")
 
     parser_get_file = sub_parsers.add_parser("get", help="Gets file from Lakefs repo", )
-    parser_get_file.add_argument("-r", "--remote-path", help="Remote file / dir path")
+    parser_get_file.add_argument("-p", "--remote-path", help="Remote file / dir path")
     parser_get_file.add_argument("-l", "--local-path", help="Local output dir")
     parser_get_file.add_argument("-c", "--changed-files-only", help="To get changed files only", default=False)
+    parser_get_file.add_argument("-r", "--repository", help="repository to get data from")
 
     parser_put_file = sub_parsers.add_parser("put", help="Puts file to Lakefs repo")
     parser_put_file.add_argument("-l", "--local-path", help="Local dir to push")
