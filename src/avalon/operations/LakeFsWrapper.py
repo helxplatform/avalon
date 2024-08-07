@@ -5,7 +5,7 @@ import urllib.parse
 import requests
 
 from lakefs_sdk.client import LakeFSClient
-from lakefs_sdk import Configuration, CommitCreation, BranchCreation, exceptions
+from lakefs_sdk import Configuration, CommitCreation, BranchCreation, exceptions, TagCreation
 
 from typing import List
 
@@ -233,3 +233,23 @@ class LakeFsWrapper:
             commit_id = self._client.branches_api.create_branch(repository=repository_name,
                                                                 branch_creation=branch_creation)
             return {"commit_id": commit_id, "id": branch_name}
+
+
+    def create_tag(self,  repository_name: str, commit_id: str, tag_name: str):
+        """
+        Creates a new tag
+        """
+        logging.info("Creating new tag: {0}".format(tag_name))
+        self._client.tags_api.create_tag(repository=repository_name, tag_creation=TagCreation(id=tag_name, ref=commit_id))
+        logging.info("Creating of new tag completed")
+
+
+    def get_tags(self, repository_name: str) -> dict[str, str]:
+        """
+        Returns list of tags for a given repository.
+        """
+        resp = self._client.tags_api.list_tags(repository=repository_name)
+        res = dict[str, str]()
+        for tag in resp.results:
+            res[tag.id] = tag.commit_id
+        return res
