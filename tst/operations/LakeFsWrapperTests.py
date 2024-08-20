@@ -58,7 +58,7 @@ class LakeFsWrapperTests(unittest.TestCase):
 
     def test_Upload(self):
         lfs = LakeFsWrapper(configuration=self.get_config())
-        rootpath = "../data/test1/"
+        rootpath = "./data/test1/"
         files = get_filepaths(rootpath)
         root_destpath = "20001212/"
         dest_paths = get_dest_filepaths(files, rootpath, root_destpath)
@@ -87,7 +87,7 @@ class LakeFsWrapperTests(unittest.TestCase):
 
     def test_FileIntegrityTest_Upload(self):
         lfs = LakeFsWrapper(configuration=self.get_config())
-        rootpath = "../data/test4/"
+        rootpath = "./data/test4/"
         files = get_filepaths(rootpath)
         root_destpath = "integrity/"
         dest_paths = get_dest_filepaths(files, rootpath, root_destpath)
@@ -127,7 +127,7 @@ class LakeFsWrapperTests(unittest.TestCase):
     def test_GetChanges(self):
         lfs = LakeFsWrapper(configuration=self.get_config())
         files = lfs.get_changes("main", BIGPIPELINEOPERATION, "20001212",
-                                "e5759e1ea49a81bdfcd8acfef186dfb04458e5baaca03c38fca58d79f662d2ac")
+                                "<INSERT_COMMIT_ID>")
         print(files)
 
     def test_ListFiles(self):

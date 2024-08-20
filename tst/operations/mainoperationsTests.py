@@ -8,7 +8,7 @@ from avalon.operations.LakeFsWrapper import LakeFsWrapper
 from avalon.operations.files import get_filepaths, create_dirs
 
 
-LOCALTEMPPATH = "temp"
+LOCALTEMPPATH = "./temp"
 REPO = "testavalon-task3"
 
 
@@ -20,7 +20,7 @@ class MainOperationsTests(unittest.TestCase):
         create_dirs([LOCALTEMPPATH])
 
     def get_config(self) -> Configuration:
-        config = Configuration(host='http://localhost:8000/api/v1',
+        config = Configuration(host='http://localhost:8001/api/v1',
                                              username='AKIAIOSFOLQUICKSTART',
                                              password='wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY')
 
@@ -30,7 +30,7 @@ class MainOperationsTests(unittest.TestCase):
     def test_put_files(self):
         lfs = LakeFsWrapper(configuration=self.get_config())
 
-        put_files(local_path="../data/test1/",
+        put_files(local_path="./data/test1/",
                   repo=REPO,
                   branch="main",
                   remote_path="result",
@@ -53,7 +53,7 @@ class MainOperationsTests(unittest.TestCase):
     def test_put_files_update_files(self):
         lfs = LakeFsWrapper(configuration=self.get_config())
 
-        put_files(local_path="../data/test2/",
+        put_files(local_path="./data/test2/",
                   repo=REPO,
                   branch="main",
                   remote_path="result",
@@ -65,7 +65,7 @@ class MainOperationsTests(unittest.TestCase):
                   s3storage=False,
                   task_name="Task3")
 
-        put_files(local_path="../data/test3/",
+        put_files(local_path="./data/test3/",
                   repo=REPO,
                   branch="main",
                   remote_path="result",
@@ -83,8 +83,8 @@ class MainOperationsTests(unittest.TestCase):
         self.assertListEqual(result, [
                                       'result/dir1/file2.txt',
                                       'result/dir1/file3.txt',
-                                      'result/file1.txt',
-                                      'result/file4.txt'
+                                      'result/dir1/file4.txt',
+                                      'result/file1.txt'
                                       ])
 
 
@@ -98,12 +98,12 @@ class MainOperationsTests(unittest.TestCase):
                   branch="main",
                   changes_only=False)
 
-        result = get_filepaths(LOCALTEMPPATH)
-        self.assertListEqual(result, ['temp/.empty',
-                                      'temp/result/file1.txt',
-                                      'temp/result/file4.txt',
-                                      'temp/result/dir1/file3.txt',
-                                      'temp/result/dir1/file2.txt'])
+        result = get_filepaths(LOCALTEMPPATH + "/result")
+        self.assertListEqual(result, [
+                                      './temp/result/file1.txt',
+                                      './temp/result/dir1/file2.txt',
+                                      './temp/result/dir1/file3.txt',
+                                      './temp/result/dir1/file4.txt'])
 
     def test_get_files_changes_only(self):
       #  CLEAN RESULT DIR BEFORE RUN
@@ -133,7 +133,7 @@ class MainOperationsTests(unittest.TestCase):
         #need to run after test_put_files_update_files
         lfs = LakeFsWrapper(configuration=self.get_config())
         input_commit_id = get_last_input_commit_id(branch="main", lake_fs_client=lfs, remote_path="result", repo=REPO)
-        self.assertEquals("1" * 63 + "3", input_commit_id)
+        self.assertEqual("1" * 63 + "3", input_commit_id)
 
 
 
