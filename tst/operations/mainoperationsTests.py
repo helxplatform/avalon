@@ -19,6 +19,11 @@ class MainOperationsTests(unittest.TestCase):
     def setUpClass(cls):
         create_dirs([LOCALTEMPPATH])
 
+    @classmethod
+    def tearDownClass(cls):
+        shutil.rmtree(LOCALTEMPPATH)
+
+
     def get_config(self) -> Configuration:
         config = Configuration(host='http://localhost:8001/api/v1',
                                              username='AKIAIOSFOLQUICKSTART',
@@ -56,7 +61,7 @@ class MainOperationsTests(unittest.TestCase):
         put_files(local_path="./data/test2/",
                   repo=REPO,
                   branch="main",
-                  remote_path="result",
+                  remote_path="result2",
                   commit_id="1" * 63 + "2",
                   pipeline_id="TestAvalon",
                   task_docker_image="image2",
@@ -68,7 +73,7 @@ class MainOperationsTests(unittest.TestCase):
         put_files(local_path="./data/test3/",
                   repo=REPO,
                   branch="main",
-                  remote_path="result",
+                  remote_path="result2",
                   commit_id="1" * 63 + "3",
                   pipeline_id="TestAvalon",
                   task_docker_image="image2",
@@ -78,13 +83,13 @@ class MainOperationsTests(unittest.TestCase):
                   task_name="Task3")
 
 
-        result = lfs.get_filelist("main", REPO, remote_path="result")
+        result = lfs.get_filelist("main", REPO, remote_path="result2")
 
         self.assertListEqual(result, [
-                                      'result/dir1/file2.txt',
-                                      'result/dir1/file3.txt',
-                                      'result/dir1/file4.txt',
-                                      'result/file1.txt'
+                                      'result2/dir1/file2.txt',
+                                      'result2/dir1/file3.txt',
+                                      'result2/dir1/file4.txt',
+                                      'result2/file1.txt'
                                       ])
 
 
