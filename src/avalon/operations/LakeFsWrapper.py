@@ -42,6 +42,13 @@ class LakeFsWrapper:
         self._client.repositories_api.create_repository(
             repository_creation=RepositoryCreation(name=repo.Id, storage_namespace=repo.StorageNamespace))
 
+    def delete_repository(self, repo: Repository) -> None:
+        """
+        deletes repository
+        :param repo: repository name
+        """
+        self._client.repositories_api.delete_repository(repository=repo.Id, storage_namespace=repo.StorageNamespace)
+
     def list_branches(self, repository_name: str):
         """
         List branches in a repo
@@ -139,13 +146,14 @@ class LakeFsWrapper:
         matching_files = list(filter(lambda f: f.startswith(remote_path) or remote_path == '*', paths))
         return matching_files
 
-    def get_changes(self, branch: str, repository: str, remote_path: str, from_commit_id: str) -> List[str]:
+    def get_changes(self, branch: str, repository: str, remote_path: str, from_commit_id: str, to_commit_id: str = None) -> List[str]:
         """
         Returns list of remote paths that were changed since specified commit
         :param branch: branch name
         :param repository: repository name
         :param remote_path: path as in Lakefs
         :param from_commit_id: id of a commit
+        :param to_commit_id: id of a commit (optional)
         :return: list ot remote paths in LakeFs
         """
         files_changed = []
@@ -155,17 +163,21 @@ class LakeFsWrapper:
         commits = self.list_commits(repository_name=repository, branch_name=branch, path=remote_path.split("/")).results
         commits_to_proc = []
 
-        for commit in commits:
-            if commit.id != from_commit_id:
-                commits_to_proc.append(commit)
-            else:
-                break
+        if to_commit_id is None:
 
-        if len(commits_to_proc) == 0:
-            raise NotFoundException()
+            for commit in commits:
+                if commit.id != from_commit_id:
+                    commits_to_proc.append(commit)
+                else:
+                    break
 
-        # for commit in commits_to_proc:
-        files = self._client.refs_api.diff_refs(repository=repository, right_ref=commits_to_proc[0].id, left_ref=from_commit_id).results
+            if len(commits_to_proc) == 0:
+                raise NotFoundException()
+
+            files = self._client.refs_api.diff_refs(repository=repository, right_ref=commits_to_proc[0].id, left_ref=from_commit_id).results
+        else:
+            files = self._client.refs_api.diff_refs(repository=repository, right_ref=to_commit_id, left_ref=from_commit_id).results
+
         for file in files:
             if file.type == 'added':
                 files_added.append(file.path)
@@ -181,13 +193,13 @@ class LakeFsWrapper:
         matching_files = list(filter(lambda f: f.startswith(remote_path), paths))
         return matching_files
 
-    def download_files(self, remote_files: List[str], local_path: str, repository: str, branch: str) -> None:
+    def download_files(self, remote_files: List[str], local_path: str, repository: str, branch_or_commit_id: str) -> None:
         """
         Downloads files from LakeFs
         :param remote_files:  list ot remote paths in LakeFs
         :param local_path: local path, destination for files
         :param repository: repository name
-        :param branch: branch name
+        :param branch_or_commit_id: branch name or commit_id
         :return: None
         """
         dirs = set(map(lambda x: os.path.join(local_path, os.path.dirname(x)), remote_files))
@@ -197,11 +209,11 @@ class LakeFsWrapper:
             dir_name = os.path.dirname(location)
             dest_path = os.path.join(local_path, dir_name, file_name)
 
-            self.download_file(dest_path, branch, location, repository)
+            self.download_file(dest_path, branch_or_commit_id, location, repository)
 
-    def download_file(self, dest_path, branch, location, repository):
-        logging.info("Downloading file: {0}, {1}, {2}".format(branch, location, repository))
-        file_info = self._client.objects_api.stat_object(repository=repository, ref=branch, path=location)
+    def download_file(self, dest_path, branch_or_commit_id, location, repository):
+        logging.info("Downloading file: {0}, {1}, {2}".format(branch_or_commit_id, location, repository))
+        file_info = self._client.objects_api.stat_object(repository=repository, ref=branch_or_commit_id, path=location)
         file_size = file_info.size_bytes
         logging.info("File size: {0}".format(file_size))
         chunk = 32 * 1024 * 1024
@@ -213,7 +225,7 @@ class LakeFsWrapper:
                 to_bytes = min(current_pos + chunk, file_size - 1)
                 logging.info("Downloading bytes: {0} - {1}".format(from_bytes, to_bytes))
                 obj_bytes = self._client.objects_api.get_object(repository=repository,
-                                                                ref=branch,
+                                                                ref=branch_or_commit_id,
                                                                 path=location,
                                                                 range="bytes={0}-{1}".format(from_bytes, to_bytes))
                 f.write(obj_bytes)
