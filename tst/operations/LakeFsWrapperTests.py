@@ -58,7 +58,7 @@ class LakeFsWrapperTests(unittest.TestCase):
 
     def test_Upload(self):
         lfs = LakeFsWrapper(configuration=self.get_config())
-        rootpath = "../data/test1/"
+        rootpath = "./data/test1/"
         files = get_filepaths(rootpath)
         root_destpath = "20001212/"
         dest_paths = get_dest_filepaths(files, rootpath, root_destpath)
@@ -87,7 +87,7 @@ class LakeFsWrapperTests(unittest.TestCase):
 
     def test_FileIntegrityTest_Upload(self):
         lfs = LakeFsWrapper(configuration=self.get_config())
-        rootpath = "../data/test4/"
+        rootpath = "./data/test4/"
         files = get_filepaths(rootpath)
         root_destpath = "integrity/"
         dest_paths = get_dest_filepaths(files, rootpath, root_destpath)
@@ -124,11 +124,48 @@ class LakeFsWrapperTests(unittest.TestCase):
         files = lfs.get_filelist("main", BIGPIPELINEOPERATION, "20001212")
         lfs.download_files(['filenotexist.txt'], LOCALTEMPPATH, BIGPIPELINEOPERATION, "main")
 
-    def test_GetChanges(self):
+
+    def _put_files(self, repo: str, path_to_commit: str, dest_path: str):
         lfs = LakeFsWrapper(configuration=self.get_config())
-        files = lfs.get_changes("main", BIGPIPELINEOPERATION, "20001212",
-                                "e5759e1ea49a81bdfcd8acfef186dfb04458e5baaca03c38fca58d79f662d2ac")
-        print(files)
+
+        files = get_filepaths(path_to_commit)
+        dest_paths = get_dest_filepaths(files, path_to_commit, dest_path)
+
+        cmt = Commit(
+            message=f"commit pushed by task: task_name_1, pipeline: pipeline_1",
+            repo=repo,
+            branch="main",
+            metadata=CommitMetaData(pipeline_id="pipeline_1", task_name="task_name_1", task_image="docker_image_1"),
+            files_added=files,
+            committer="avalon",
+            commit_date=datetime.now()
+        )
+        lfs.upload_files(cmt.branch, cmt.repo, files, dest_paths)
+        lfs.commit_files(cmt)
+
+    def test_GetChanges_2(self):
+        repo = "getchangesrepo"
+        path_in_repo = "test_changes"
+        lfs = LakeFsWrapper(configuration=self.get_config())
+        lfs.create_repository(Repository(repo, f"local://{repo}/"))
+        self._put_files(repo, "./data/test_get_changes/commit_1/", "test_changes")
+        self._put_files(repo, "./data/test_get_changes/commit_2/", "test_changes")
+        self._put_files(repo, "./data/test_get_changes/commit_3/", "test_changes")
+        self._put_files(repo, "./data/test_get_changes/commit_4/", "test_changes")
+
+        lfs = LakeFsWrapper(configuration=self.get_config())
+
+        commits = lfs.list_commits(repo, "main", path_in_repo.split("/"))
+        files = lfs.get_changes("main", repo, path_in_repo, from_commit_id=commits.results[2].id)
+        # it should get all files between commit_2 and commit_4
+        self.assertListEqual(files, ['test_changes/f2.txt', 'test_changes/f3.txt', 'test_changes/f4.txt'])
+
+        # it should get all files between commit_2 and commit_3
+        files = lfs.get_changes("main", repo, path_in_repo, from_commit_id=commits.results[2].id, to_commit_id=commits.results[1].id)
+        self.assertListEqual(files, ['test_changes/f2.txt', 'test_changes/f3.txt'])
+
+        lfs.download_files(['test_changes/f2.txt'], LOCALTEMPPATH, repo, commits.results[0].id)
+
 
     def test_ListFiles(self):
         lfs = LakeFsWrapper(configuration=self.get_config())

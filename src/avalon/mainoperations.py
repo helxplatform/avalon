@@ -31,7 +31,8 @@ def get_files(local_path: str,
               branch: str,
               lake_fs_client: LakeFsWrapper,
               changes_only: bool,
-              changes_from: str = None):
+              changes_from: str = None,
+              changes_to: str = None):
     all_repos = [r.Id for r in lake_fs_client.list_repo()]
 
     if not os.path.exists(local_path):
@@ -45,7 +46,8 @@ def get_files(local_path: str,
     if changes_only:
         try:
             # if commit_id is empty nonexistant then we will get all files, not just changed ones
-            filelist = lake_fs_client.get_changes(repository=repo, branch=branch, remote_path=remote_path, from_commit_id=changes_from)
+            filelist = lake_fs_client.get_changes(repository=repo, branch=branch, remote_path=remote_path,
+                                                  from_commit_id=changes_from, to_commit_id=changes_to)
         except NotFoundException:
             filelist = lake_fs_client.get_filelist(repository=repo, branch=branch, remote_path=remote_path)
     else:
@@ -53,7 +55,7 @@ def get_files(local_path: str,
 
     try:
         logger.info("Trying to download files from LakeFS")
-        lake_fs_client.download_files(remote_files=filelist, local_path=local_path, repository=repo, branch=branch)
+        lake_fs_client.download_files(remote_files=filelist, local_path=local_path, repository=repo, branch_or_commit_id=branch)
         logger.info("Downloading files from LakeFS completed")
     except Exception as ex:
         logger.info("Failed to download files from LakeFS ")
