@@ -10,6 +10,10 @@ from avalon.operations.LakeFsWrapper import LakeFsWrapper
 from avalon.operations.files import get_filepaths, get_dest_filepaths
 
 logger = logging.Logger('avalon')
+stdout_log_handler = logging.StreamHandler(sys.stdout)
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+stdout_log_handler.setFormatter(formatter)
+logger.addHandler(stdout_log_handler)
 
 INPUT_COMMIT_ID = 'input_commit_id'
 
