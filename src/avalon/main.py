@@ -25,13 +25,16 @@ def main(args):
         put_files(
             local_path=args.local_path,
             remote_path=args.remote_path,
+            s3storage=args.s3,
             branch=env_args['lakefs_branch'],
+            source_branch_name="",
             lake_fs_client=client,
             task_name=args.task_name,
             pipeline_id=args.pipeline_name,
             task_docker_image=args.task_image,
             task_args=args.task_args,
-            commit_id=args.commit_id
+            commit_id=args.commit_id,
+            repo=args.repository
         )
     else:
         get_files(
@@ -66,6 +69,7 @@ def cli():
     parser_put_file.add_argument("-i", "--task-image", help="Docker image used to run task", default="helxplatform/roger")
     parser_put_file.add_argument("-cid", "--commit-id", help="Commit id of input data", default=None)
     parser_put_file.add_argument("-a", "--task-args", help="Args used to run image", default=[])
+    parser_put_file.add_argument("-R", "--repository", help="repository to get data from")
     
     args = parser.parse_args()
     main(args)
