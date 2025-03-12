@@ -1,4 +1,5 @@
 <img alt="Avalon" height="100px" src="https://github.com/helxplatform/roger/assets/45075777/227737ae-2833-490e-b390-9d4893835a86" width="100px"/>
+
 # Avalon
 
 ## Overview
@@ -8,7 +9,7 @@ Avalon is a command-line tool for interacting with LakeFS repositories. It allow
 To install Avalon, use the following command:
 
 ```bash
-pip install .
+pip install git+https://github.com/helxplatform/avalon.git
 ```
 
 This will install Avalon as a command-line utility.
@@ -30,7 +31,7 @@ Avalon provides two main commands: `put` and `get`.
 To download files from a LakeFS repository:
 
 ```bash
-avalon get -c /path/to/credentials.yaml \
+avalon -c /path/to/credentials.yaml  get \
            -p remote/path/in/repo \
            -l /local/destination/path \
            -r repository_name \
@@ -47,7 +48,7 @@ avalon get -c /path/to/credentials.yaml \
 To upload files to a LakeFS repository:
 
 ```bash
-avalon put -c /path/to/credentials.yaml \
+avalon -c /path/to/credentials.yaml put \
            -p remote/destination/path \
            -l /local/source/path \
            -r repository_name \
