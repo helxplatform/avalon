@@ -15,6 +15,9 @@ from lakefs_sdk.models.repository_creation import RepositoryCreation
 from avalon.models.pipeline import Commit, Repository
 from avalon.operations.files import create_dirs
 
+# Import tqdm for progress bars
+from tqdm import tqdm
+
 
 class LakeFsWrapper:
     def __init__(self, configuration: Configuration):
@@ -52,7 +55,7 @@ class LakeFsWrapper:
     def list_branches(self, repository_name: str):
         """
         List branches in a repo
-        :param: repository_name Name of repo
+        :param repository_name: Name of repo
         :return: List of branches
         """
         branches = self._client.branches_api.list_branches(repository=repository_name)
@@ -85,16 +88,29 @@ class LakeFsWrapper:
 
     def upload_files(self, branch: str, repository: str, files: List[str], dest_paths: List[str]):
         """
-        This function uploads files
+        This function uploads files with chunking and a progress bar
         """
         login_cookie = self._get_login_cookie()
+        chunk_size = 8 * 1024 * 1024  # 8 MB per chunk
         for i in range(len(files)):
-            with open(files[i], 'rb') as f:
-                url = f'{self._config.host}/repositories/{urllib.parse.quote_plus(repository)}/branches/{urllib.parse.quote_plus(branch)}/objects?path={urllib.parse.quote_plus(dest_paths[i])}'
-                res = requests.post(url, data=f, cookies=login_cookie)
-                if res.status_code != 201:
-                    raise Exception(f"Failed to upload file to lakefs: {res.text}")
-                logging.info(f'Upload file result: {res.text}')
+            file_path = files[i]
+            dest_path = dest_paths[i]
+            url = f'{self._config.host}/repositories/{urllib.parse.quote_plus(repository)}/branches/{urllib.parse.quote_plus(branch)}/objects?path={urllib.parse.quote_plus(dest_path)}'
+            filesize = os.path.getsize(file_path)
+            with open(file_path, 'rb') as f, tqdm(total=filesize, unit='B', unit_scale=True,
+                                                   desc=f"Uploading {os.path.basename(file_path)}") as progress:
+                def read_in_chunks(file_object, chunk_size):
+                    while True:
+                        data = file_object.read(chunk_size)
+                        if not data:
+                            break
+                        progress.update(len(data))
+                        yield data
+
+                res = requests.post(url, data=read_in_chunks(f, chunk_size), cookies=login_cookie)
+            if res.status_code != 201:
+                raise Exception(f"Failed to upload file to lakefs: {res.text}")
+            logging.info(f'Upload file result: {res.text}')
 
     def _get_login_cookie(self):
         login_url = f"{self._config.host}/auth/login"
@@ -105,15 +121,14 @@ class LakeFsWrapper:
 
         return auth_resp.cookies
 
-
     def upload_file(self, branch: str, repository: str, content: str, dest_path: str):
         """
         This function uploads str to file
         """
         self._client.objects_api.upload_object(repository=repository,
-                                               branch=branch,
-                                               path=dest_path,
-                                               content=bytes(content, 'utf-8'))
+                                                 branch=branch,
+                                                 path=dest_path,
+                                                 content=bytes(content, 'utf-8'))
 
     def get_filelist(self, branch: str, repository: str, remote_path: str) -> List[str]:
         """
@@ -125,7 +140,6 @@ class LakeFsWrapper:
         """
         results = []
         has_results = True
-        current = 0
         next_page = None
         while has_results:
             if not next_page:
@@ -140,9 +154,7 @@ class LakeFsWrapper:
             results += objects.results
             has_results = objects.pagination.has_more
             next_page = objects.pagination.next_offset
-        paths = []
-        for obj in results:
-            paths.append(obj.path)
+        paths = [obj.path for obj in results]
         matching_files = list(filter(lambda f: f.startswith(remote_path) or remote_path == '*', paths))
         return matching_files
 
@@ -154,7 +166,7 @@ class LakeFsWrapper:
         :param remote_path: path as in Lakefs
         :param from_commit_id: id of a commit
         :param to_commit_id: id of a commit (optional)
-        :return: list ot remote paths in LakeFs
+        :return: list of remote paths in LakeFs
         """
         files_changed = []
         files_removed = []
@@ -164,7 +176,6 @@ class LakeFsWrapper:
         commits_to_proc = []
 
         if to_commit_id is None:
-
             for commit in commits:
                 if commit.id != from_commit_id:
                     commits_to_proc.append(commit)
@@ -186,17 +197,14 @@ class LakeFsWrapper:
             elif file.type == 'changed':
                 files_changed.append(file.path)
 
-        paths = []
-        paths.extend(files_changed)
-        paths.extend(files_added)
-
+        paths = files_changed + files_added
         matching_files = list(filter(lambda f: f.startswith(remote_path), paths))
         return matching_files
 
     def download_files(self, remote_files: List[str], local_path: str, repository: str, branch_or_commit_id: str) -> None:
         """
         Downloads files from LakeFs
-        :param remote_files:  list ot remote paths in LakeFs
+        :param remote_files:  list of remote paths in LakeFs
         :param local_path: local path, destination for files
         :param repository: repository name
         :param branch_or_commit_id: branch name or commit_id
@@ -216,23 +224,24 @@ class LakeFsWrapper:
         file_info = self._client.objects_api.stat_object(repository=repository, ref=branch_or_commit_id, path=location)
         file_size = file_info.size_bytes
         logging.info("File size: {0}".format(file_size))
-        chunk = 32 * 1024 * 1024
+        chunk = 32 * 1024 * 1024  # 32 MB per chunk
         current_pos = 0
 
-        with open(dest_path, 'wb') as f:
+        with open(dest_path, 'wb') as f, tqdm(total=file_size, unit='B', unit_scale=True,
+                                               desc=f"Downloading {os.path.basename(dest_path)}") as progress:
             while current_pos < file_size:
                 from_bytes = current_pos
                 to_bytes = min(current_pos + chunk, file_size - 1)
                 logging.info("Downloading bytes: {0} - {1}".format(from_bytes, to_bytes))
                 obj_bytes = self._client.objects_api.get_object(repository=repository,
-                                                                ref=branch_or_commit_id,
-                                                                path=location,
-                                                                range="bytes={0}-{1}".format(from_bytes, to_bytes))
+                                                                  ref=branch_or_commit_id,
+                                                                  path=location,
+                                                                  range="bytes={0}-{1}".format(from_bytes, to_bytes))
                 f.write(obj_bytes)
+                progress.update(len(obj_bytes))
                 current_pos = to_bytes + 1
 
         logging.info("Downloading completed: {0}".format(current_pos - 1))
-
 
     def create_branch(self, branch_name: str, repository_name: str, source_branch: str = "main"):
         """
@@ -246,15 +255,13 @@ class LakeFsWrapper:
                                                                 branch_creation=branch_creation)
             return {"commit_id": commit_id, "id": branch_name}
 
-
-    def create_tag(self,  repository_name: str, commit_id: str, tag_name: str):
+    def create_tag(self, repository_name: str, commit_id: str, tag_name: str):
         """
         Creates a new tag
         """
         logging.info("Creating new tag: {0}".format(tag_name))
         self._client.tags_api.create_tag(repository=repository_name, tag_creation=TagCreation(id=tag_name, ref=commit_id))
         logging.info("Creating of new tag completed")
-
 
     def get_tags(self, repository_name: str) -> dict[str, str]:
         """

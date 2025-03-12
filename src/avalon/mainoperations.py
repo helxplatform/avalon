@@ -8,6 +8,7 @@ from retrying import retry
 from avalon.models.pipeline import CommitMetaData, Commit, Repository
 from avalon.operations.LakeFsWrapper import LakeFsWrapper
 from avalon.operations.files import get_filepaths, get_dest_filepaths
+import sys
 
 logger = logging.Logger('avalon')
 stdout_log_handler = logging.StreamHandler(sys.stdout)
@@ -90,7 +91,7 @@ def put_files(local_path: str,
         task_name=task_name,
         task_image=task_docker_image,
         input_commit_id=commit_id,
-        args=task_args
+        args=task_args or []
     )
     cmt = Commit(
         message=f"commit pushed by task: {task_name}, pipeline: {pipeline_id}",
@@ -107,9 +108,14 @@ def put_files(local_path: str,
     # if uploaded files are the same, it will cause an exception.
     # we can ignore such situation
     try:
-        lake_fs_client.commit_files(cmt)
+        commit = lake_fs_client.commit_files(cmt)
+        logger.info(
+            f"commit pushed: {lake_fs_client._config.host.replace('/api/v1', '')}/repositories/{cmt.repo}/commits/{commit.id}"
+        )
+        commit.id
     except ApiException as ex:
         if str.find(ex.body, 'commit: no changes') == -1:
+            logger.error(ex.body)
             raise ex
 
 
