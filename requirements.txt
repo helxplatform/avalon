@@ -5,3 +5,4 @@ httpx
 boto3
 retrying
 requests
+tqdm
