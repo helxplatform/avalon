@@ -3,6 +3,8 @@ import logging
 import os
 import urllib.parse
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from lakefs_sdk.client import LakeFSClient
 from lakefs_sdk import Configuration, CommitCreation, BranchCreation, exceptions, TagCreation
@@ -18,12 +20,26 @@ from avalon.operations.files import create_dirs
 # Import tqdm for progress bars
 from tqdm import tqdm
 
+try:
+    import http.client as http_client
+except ImportError:
+    # Python 2
+    import httplib as http_client
+http_client.HTTPConnection.debuglevel = 1
+
+
+logging.basicConfig()
+logging.getLogger().setLevel(logging.DEBUG)
+requests_log = logging.getLogger("requests.packages.urllib3")
+requests_log.setLevel(logging.DEBUG)
+requests_log.propagate = True
 
 class LakeFsWrapper:
     def __init__(self, configuration: Configuration):
         os.environ.get('')
         self._config = configuration
         self._client = LakeFSClient(configuration=configuration)
+        self.session = self._create_session()
 
     def list_repo(self) -> list[Repository]:
         """
@@ -86,6 +102,20 @@ class LakeFsWrapper:
         )
         return response
 
+    def _create_session(self):
+        """Creates a session with retries for robust error handling."""
+        session = requests.Session()
+        # session.headers.update({'Transfer-Encoding': 'chunked'})
+        retries = Retry(
+            total=5,  # Number of retries
+            backoff_factor=2,  # Exponential backoff (2s, 4s, 8s, etc.)
+            status_forcelist=[500, 502, 503, 504],  # Retry only for these HTTP errors
+            allowed_methods=["POST"],  # Apply retry only for POST
+        )
+        adapter = HTTPAdapter(max_retries=retries)
+        session.mount("https://", adapter)
+        return session
+
     def upload_files(self, branch: str, repository: str, files: List[str], dest_paths: List[str]):
         """
         This function uploads files with chunking and a progress bar
@@ -107,7 +137,9 @@ class LakeFsWrapper:
                         progress.update(len(data))
                         yield data
 
-                res = requests.post(url, data=read_in_chunks(f, chunk_size), cookies=login_cookie)
+                res = self.session.post(url, data=read_in_chunks(f, chunk_size), cookies=login_cookie,
+                                        # headers={'Transfer-Encoding': 'chunked'}
+                                        )
             if res.status_code != 201:
                 raise Exception(f"Failed to upload file to lakefs: {res.text}")
             logging.info(f'Upload file result: {res.text}')
