@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import urllib.parse
+from concurrent.futures import ThreadPoolExecutor
 import requests
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
@@ -19,6 +20,21 @@ from avalon.operations.files import create_dirs
 
 # Import tqdm for progress bars
 from tqdm import tqdm
+
+# Objects are transferred one at a time by default, which is the wrong shape
+# for the many-small-files case: a task staging 123k pickles spends its time
+# waiting on round trips, not on bandwidth. These bound the transfer pools.
+# Override with AVALON_TRANSFER_WORKERS. Keep at or below the sdk's
+# connection_pool_maxsize (cpu_count() * 5) or threads queue on connections.
+DEFAULT_TRANSFER_WORKERS = 16
+
+
+def _transfer_workers(requested, count):
+    """Worker count for a transfer of `count` objects."""
+    if requested is None:
+        requested = int(os.environ.get('AVALON_TRANSFER_WORKERS',
+                                       DEFAULT_TRANSFER_WORKERS))
+    return max(1, min(int(requested), count))
 
 try:
     import http.client as http_client
@@ -116,33 +132,67 @@ class LakeFsWrapper:
         session.mount("https://", adapter)
         return session
 
-    def upload_files(self, branch: str, repository: str, files: List[str], dest_paths: List[str]):
+    def upload_files(self, branch: str, repository: str, files: List[str], dest_paths: List[str],
+                     max_workers: int = None):
         """
         This function uploads files with chunking and a progress bar
+
+        Uploads run concurrently for the same reason downloads do: a task
+        committing tens of thousands of small outputs is bound by round
+        trips. Each upload targets its own path, so they share nothing but
+        the login cookie and the retrying session, both of which are read
+        only here.
+
+        :param max_workers: concurrent uploads; defaults to
+            AVALON_TRANSFER_WORKERS or DEFAULT_TRANSFER_WORKERS
         """
         login_cookie = self._get_login_cookie()
         chunk_size = 8 * 1024 * 1024  # 8 MB per chunk
-        for i in range(len(files)):
-            file_path = files[i]
-            dest_path = dest_paths[i]
+
+        def upload_one(file_path, dest_path, show_progress):
             url = f'{self._config.host}/repositories/{urllib.parse.quote_plus(repository)}/branches/{urllib.parse.quote_plus(branch)}/objects?path={urllib.parse.quote_plus(dest_path)}'
             filesize = os.path.getsize(file_path)
-            with open(file_path, 'rb') as f, tqdm(total=filesize, unit='B', unit_scale=True,
-                                                   desc=f"Uploading {os.path.basename(file_path)}") as progress:
-                def read_in_chunks(file_object, chunk_size):
-                    while True:
-                        data = file_object.read(chunk_size)
-                        if not data:
-                            break
-                        progress.update(len(data))
-                        yield data
+            progress = tqdm(total=filesize, unit='B', unit_scale=True,
+                            desc=f"Uploading {os.path.basename(file_path)}") if show_progress else None
+            try:
+                with open(file_path, 'rb') as f:
+                    def read_in_chunks(file_object, chunk_size):
+                        while True:
+                            data = file_object.read(chunk_size)
+                            if not data:
+                                break
+                            if progress is not None:
+                                progress.update(len(data))
+                            yield data
 
-                res = self.session.post(url, data=read_in_chunks(f, chunk_size), cookies=login_cookie,
-                                        # headers={'Transfer-Encoding': 'chunked'}
-                                        )
+                    res = self.session.post(url, data=read_in_chunks(f, chunk_size), cookies=login_cookie,
+                                            # headers={'Transfer-Encoding': 'chunked'}
+                                            )
+            finally:
+                if progress is not None:
+                    progress.close()
             if res.status_code != 201:
                 raise Exception(f"Failed to upload file to lakefs: {res.text}")
-            logging.info(f'Upload file result: {res.text}')
+            logging.debug('Upload file result: %s', res.text)
+
+        workers = _transfer_workers(max_workers, len(files))
+        logging.info("Uploading %d file(s) to %s with %d worker(s)",
+                     len(files), repository, workers)
+
+        if workers == 1:
+            for file_path, dest_path in zip(files, dest_paths):
+                upload_one(file_path, dest_path, True)
+            return
+
+        with tqdm(total=len(files), unit='file',
+                  desc=f"Uploading to {repository}") as progress:
+            with ThreadPoolExecutor(max_workers=workers,
+                                    thread_name_prefix='lakefs-up') as pool:
+                futures = [pool.submit(upload_one, file_path, dest_path, False)
+                           for file_path, dest_path in zip(files, dest_paths)]
+                for future in futures:
+                    future.result()
+                    progress.update(1)
 
     def _get_login_cookie(self):
         login_url = f"{self._config.host}/auth/login"
@@ -233,47 +283,90 @@ class LakeFsWrapper:
         matching_files = list(filter(lambda f: f.startswith(remote_path), paths))
         return matching_files
 
-    def download_files(self, remote_files: List[str], local_path: str, repository: str, branch_or_commit_id: str) -> None:
+    def download_files(self, remote_files: List[str], local_path: str, repository: str, branch_or_commit_id: str,
+                       max_workers: int = None) -> None:
         """
         Downloads files from LakeFs
         :param remote_files:  list of remote paths in LakeFs
         :param local_path: local path, destination for files
         :param repository: repository name
         :param branch_or_commit_id: branch name or commit_id
+        :param max_workers: concurrent downloads; defaults to
+            AVALON_TRANSFER_WORKERS or DEFAULT_TRANSFER_WORKERS
         :return: None
         """
         dirs = set(map(lambda x: os.path.join(local_path, os.path.dirname(x)), remote_files))
         create_dirs(dirs)
-        for location in remote_files:
+
+        def target(location):
             file_name = os.path.basename(location)
             dir_name = os.path.dirname(location)
-            dest_path = os.path.join(local_path, dir_name, file_name)
+            return os.path.join(local_path, dir_name, file_name)
 
-            self.download_file(dest_path, branch_or_commit_id, location, repository)
+        workers = _transfer_workers(max_workers, len(remote_files))
+        logging.info("Downloading %d file(s) from %s with %d worker(s)",
+                     len(remote_files), repository, workers)
 
-    def download_file(self, dest_path, branch_or_commit_id, location, repository):
-        logging.info("Downloading file: {0}, {1}, {2}".format(branch_or_commit_id, location, repository))
+        if workers == 1:
+            for location in remote_files:
+                self.download_file(target(location), branch_or_commit_id, location, repository)
+            return
+
+        # Every object writes to its own path and create_dirs already ran, so
+        # the downloads share no state. Per-file progress bars are suppressed
+        # because concurrent bars interleave into noise; one bar counts files
+        # instead. The first failure is re-raised rather than left in the
+        # pool, so a partial staging still fails the caller.
+        with tqdm(total=len(remote_files), unit='file',
+                  desc=f"Downloading from {repository}") as progress:
+            with ThreadPoolExecutor(max_workers=workers,
+                                    thread_name_prefix='lakefs-dl') as pool:
+                futures = [
+                    pool.submit(self.download_file, target(location),
+                                branch_or_commit_id, location, repository,
+                                False)
+                    for location in remote_files
+                ]
+                for future in futures:
+                    future.result()
+                    progress.update(1)
+
+    def download_file(self, dest_path, branch_or_commit_id, location, repository, show_progress=True):
+        """Downloads a single object.
+
+        The four per-file log lines are at debug: at info they dominate the
+        log of any task staging many objects -- a 12k-file download emitted
+        48,740 lines, exactly four per file, and a 123k-file one wrote
+        hundreds of megabytes of them to shared storage.
+        """
+        logging.debug("Downloading file: {0}, {1}, {2}".format(branch_or_commit_id, location, repository))
         file_info = self._client.objects_api.stat_object(repository=repository, ref=branch_or_commit_id, path=location)
         file_size = file_info.size_bytes
-        logging.info("File size: {0}".format(file_size))
+        logging.debug("File size: {0}".format(file_size))
         chunk = 32 * 1024 * 1024  # 32 MB per chunk
         current_pos = 0
 
-        with open(dest_path, 'wb') as f, tqdm(total=file_size, unit='B', unit_scale=True,
-                                               desc=f"Downloading {os.path.basename(dest_path)}") as progress:
-            while current_pos < file_size:
-                from_bytes = current_pos
-                to_bytes = min(current_pos + chunk, file_size - 1)
-                logging.info("Downloading bytes: {0} - {1}".format(from_bytes, to_bytes))
-                obj_bytes = self._client.objects_api.get_object(repository=repository,
-                                                                  ref=branch_or_commit_id,
-                                                                  path=location,
-                                                                  range="bytes={0}-{1}".format(from_bytes, to_bytes))
-                f.write(obj_bytes)
-                progress.update(len(obj_bytes))
-                current_pos = to_bytes + 1
+        progress = tqdm(total=file_size, unit='B', unit_scale=True,
+                        desc=f"Downloading {os.path.basename(dest_path)}") if show_progress else None
+        try:
+            with open(dest_path, 'wb') as f:
+                while current_pos < file_size:
+                    from_bytes = current_pos
+                    to_bytes = min(current_pos + chunk, file_size - 1)
+                    logging.debug("Downloading bytes: {0} - {1}".format(from_bytes, to_bytes))
+                    obj_bytes = self._client.objects_api.get_object(repository=repository,
+                                                                      ref=branch_or_commit_id,
+                                                                      path=location,
+                                                                      range="bytes={0}-{1}".format(from_bytes, to_bytes))
+                    f.write(obj_bytes)
+                    if progress is not None:
+                        progress.update(len(obj_bytes))
+                    current_pos = to_bytes + 1
+        finally:
+            if progress is not None:
+                progress.close()
 
-        logging.info("Downloading completed: {0}".format(current_pos - 1))
+        logging.debug("Downloading completed: {0}".format(current_pos - 1))
 
     def create_branch(self, branch_name: str, repository_name: str, source_branch: str = "main"):
         """
